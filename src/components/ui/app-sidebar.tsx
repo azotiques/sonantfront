@@ -2,7 +2,7 @@ import { createGuild, getGuilds } from "#/queries/guilds";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarRail } from "./sidebar";
 import { Link, useParams } from "@tanstack/react-router";
-import { Plus, Settings } from "lucide-react";
+import { Plus } from "lucide-react";
 import { getCurrentUser } from "#/queries/users";
 import { useState, type FormEvent } from "react";
 import { ResizablePanelGroup } from "./resizable";

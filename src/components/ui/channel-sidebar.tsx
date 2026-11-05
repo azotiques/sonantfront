@@ -119,7 +119,16 @@ export function ChannelSidebar({ id1, id2 }: ChannelSidebarProps) {
                       </select>
                       <button type='submit'>Save</button>
                     </form>
-                    {createInviteData && <Link to='/app/invite/$id' params={{ id: createInviteData.inviteCode }} > localhost:3000/app/invite/{createInviteData.inviteCode}</Link>}
+                    {createInviteData &&
+                      <div className="flex flex-col gap-y-2">
+                        <span className="text-purple-200">
+                          {`https://sonant.azotix.dev/app/invite/${createInviteData.inviteCode}`}
+                        </span>
+                        <Button className="cursor-pointer" onClick={() => {
+                          navigator.clipboard.writeText(`https://sonant.azotix.dev/app/invite/${createInviteData.inviteCode}`)
+                        }} variant={"outline"}>Copy Link</Button>
+                      </div>
+                    }
                   </DialogHeader>
                 </DialogContent>
               </Dialog>

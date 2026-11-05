@@ -88,7 +88,7 @@ function RouteComponent() {
     return () => subscription.unsubscribe();
   }, [connected, id1, id2, queryClient]);
 
-  return <div className="h-screen">
+  return <div className="h-full">
     <div className="grid h-full grid-rows-[1fr_auto] overflow-hidden">
       <div className="flex flex-col gap-3 overflow-y-auto p-4">
         <ResizablePanelGroup>
