@@ -2,7 +2,7 @@ import { Client } from "@stomp/stompjs";
 import { keycloak } from "./keycloak";
 
 export const stomp = new Client({
-  brokerURL: `wss://${process.env.API_LINK}/ws`,
+  brokerURL: `wss://${import.meta.env.VITE_API_LINK}/ws`,
   reconnectDelay: 5000,
   beforeConnect: async () => {
     await keycloak.updateToken(30);
