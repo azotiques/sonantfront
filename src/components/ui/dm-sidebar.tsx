@@ -1,5 +1,5 @@
 import { getGuild } from "#/queries/guilds";
-import { skipToken, useQuery } from "@tanstack/react-query";
+import { skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getCurrentUser } from "#/queries/users";
 import { getFriendRelationships } from "#/queries/relationships";
 import { Separator } from "./separator";

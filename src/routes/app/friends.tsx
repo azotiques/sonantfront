@@ -103,7 +103,7 @@ function RouteComponent() {
           const otherUser = r.incomingUser.username === currentUser.username ? r.outgoingUser : r.incomingUser;
           return r.status === FriendStatus.FRIENDS && <div key={i}>
             <div>
-              <Link to="/app/$id1/$id2" params={{ id1: r.guild.guildId, id2: r.guild.channels[0].channelId }}>
+              <Link to="/app/$id1/$id2" params={{ id1: r.guildId, id2: r.channelId }}>
                 <ButtonGroup className="flex gap-x-2 w-full p-2 items-center hover:bg-sidebar-accent">
                   <Avatar size="lg">
                     <AvatarImage>
