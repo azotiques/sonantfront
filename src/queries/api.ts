@@ -1,6 +1,6 @@
 import { keycloak } from "#/keycloak";
 
-const API_URL = `https://${process.env.API_LINK}/api/v1`;
+const API_URL = `https://${import.meta.env.VITE_API_LINK}/api/v1`;
 
 export class ApiError extends Error {
   status: number;

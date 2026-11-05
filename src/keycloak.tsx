@@ -1,7 +1,7 @@
 import Keycloak from "keycloak-js";
 
 export const keycloak = new Keycloak({
-  url: `${process.env.AUTH_LINK}`,
+  url: `https://${import.meta.env.VITE_AUTH_LINK}`,
   realm: "master",
   clientId: 'sonant'
 });
