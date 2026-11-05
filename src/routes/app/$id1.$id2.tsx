@@ -5,7 +5,7 @@ import { deleteMessages, getMessages } from '#/queries/messages';
 import { stomp } from '#/stomp-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router'
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ResizablePanel, ResizablePanelGroup } from '#/components/ui/resizable';
 import { Ellipsis, Trash } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '#/components/ui/dropdown-menu';
@@ -25,6 +25,8 @@ function RouteComponent() {
   const { id1, id2 } = Route.useParams();
 
   const queryClient = useQueryClient();
+
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const { data: messageQuery } = useQuery({
     queryKey: ["messages", id1, id2],
@@ -78,6 +80,15 @@ function RouteComponent() {
   }, [])
 
   useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+
+    requestAnimationFrame(() => {
+      container.scrollTop = container.scrollHeight;
+    });
+  }, [messages]);
+
+  useEffect(() => {
     if (!connected || !id1 || !id2) return;
 
     const subscription = stomp.subscribe(`/topic/chat.guild.${id1}.${id2}`, (frame) => {
@@ -90,74 +101,70 @@ function RouteComponent() {
 
   return <div className="h-full">
     <div className="grid h-full grid-rows-[1fr_auto] overflow-hidden">
-      <div className="flex flex-col gap-3 overflow-y-auto p-4">
-        <ResizablePanelGroup>
-          <ResizablePanel>
-            {messages.map((m, i) => {
-              const prev = messages[i - 1];
+      <div ref={scrollRef} className="flex flex-col gap-1 overflow-y-auto p-4">
+        {messages.map((m, i) => {
+          const prev = messages[i - 1];
 
-              const isGrouped =
-                prev !== undefined &&
-                m.user !== undefined &&
-                prev.user?.id === m.user.id &&
-                new Date(m.createdAt).getTime() - new Date(prev.createdAt).getTime() < GROUP_WINDOW_MS;
+          const isGrouped =
+            prev !== undefined &&
+            m.user !== undefined &&
+            prev.user?.id === m.user.id &&
+            new Date(m.createdAt).getTime() - new Date(prev.createdAt).getTime() < GROUP_WINDOW_MS;
 
-              return (<div key={m.id}>
-                <HoverCard>
-                  <HoverCardTrigger delay={50} closeDelay={50}>
-                    <div className={`group flex gap-x-4 rounded-md px-3 py-1 hover:bg-sidebar-accent ${isGrouped ? "" : "mt-3"}`}>
-                      <div className="w-10 shrink-0">
-                        {isGrouped ? (
-                          <span className="hidden pt-1 text-right text-xs text-neutral-500 group-hover:block">
-                            {isValid(new Date(m.createdAt)) ? format(new Date(m.createdAt), "HH:mm") : ""}
-                          </span>
-                        ) : (
-                          <div className='flex flex-row items-center gap-x-4'>
-                            <Avatar size="lg">
-                              <AvatarImage src={m.user.avatar} />
-                              <AvatarFallback>
-                                {m.user.username}
-                              </AvatarFallback>
-                            </Avatar>
-                          </div>
-                        )}
+          return (<div key={m.id}>
+            <HoverCard>
+              <HoverCardTrigger delay={50} closeDelay={50}>
+                <div className={`group items-center flex gap-x-4 rounded-md px-3 py-1 hover:bg-sidebar-accent ${isGrouped ? "" : "mt-3"}`}>
+                  <div className="w-10 shrink-0">
+                    {isGrouped ? (
+                      <span className="hidden pt-1 text-right text-xs text-neutral-500 group-hover:block">
+                        {isValid(new Date(m.createdAt)) ? format(new Date(m.createdAt), "HH:mm") : ""}
+                      </span>
+                    ) : (
+                      <div className='flex flex-row items-center gap-x-4'>
+                        <Avatar size="lg">
+                          <AvatarImage src={m.user.avatar} />
+                          <AvatarFallback>
+                            {m.user.username.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        {!isGrouped && (
-                          <div className="flex items-baseline gap-x-3">
-                            <span className="font-semibold">{m.user.username}</span>
-                            <span className="text-sm text-neutral-500">
-                              {isValid(new Date(m.createdAt)) ? format(new Date(m.createdAt), "dd/MM/yy, HH:mm") : ""}
-                            </span>
-                          </div>
-                        )}
-                        <span className="whitespace-pre-wrap wrap-break-word">{m.message}</span>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    {!isGrouped && (
+                      <div className="flex items-baseline gap-x-3">
+                        <span className="font-semibold">{m.user.username}</span>
+                        <span className="text-sm text-neutral-500">
+                          {isValid(new Date(m.createdAt)) ? format(new Date(m.createdAt), "dd/MM/yy, HH:mm") : ""}
+                        </span>
                       </div>
-                    </div>
-                  </HoverCardTrigger>
-                  <HoverCardContent sideOffset={-24} side="top" align="end">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger className="h-6" render={<Button className="h-6" variant="ghost" />}>
-                        <Ellipsis />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent className="w-full">
-                        <Button onClick={() => deleteMessageHandler(m.id)} variant="destructive"><Trash /> Delete message</Button>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </HoverCardContent>
-                </HoverCard>
-              </div>
-              )
-            }
-            )}
-          </ResizablePanel>
-        </ResizablePanelGroup>
+                    )}
+                    <span className="whitespace-pre-wrap wrap-break-word">{m.message}</span>
+                  </div>
+                </div>
+              </HoverCardTrigger>
+              <HoverCardContent sideOffset={-24} side="top" align="end">
+                <DropdownMenu>
+                  <DropdownMenuTrigger className="h-6" render={<Button className="h-6" variant="ghost" />}>
+                    <Ellipsis />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-full">
+                    <Button onClick={() => deleteMessageHandler(m.id)} variant="destructive"><Trash /> Delete message</Button>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </HoverCardContent>
+            </HoverCard>
+          </div>
+          )
+        }
+        )}
       </div>
       <div className="p-4">
         <form className="flex items-center gap-2" onSubmit={messageHandler}>
           <ButtonGroup className="flex-1 border-neutral-100">
             <Input className="h-14" value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Message..." />
-            <Button variant="outline" className="h-14">Send</Button>
+            <Button type="submit" variant="outline" className="h-14">Send</Button>
           </ButtonGroup>
         </form>
       </div>
