@@ -1,0 +1,129 @@
+import { Avatar, AvatarFallback, AvatarImage } from '#/components/ui/avatar';
+import { Button } from '#/components/ui/button';
+import { ButtonGroup, ButtonGroupSeparator } from '#/components/ui/button-group';
+import { Input } from '#/components/ui/input';
+import { Separator } from '#/components/ui/separator';
+import { acceptFriendRelationship, createRelationship, getFriendRelationships, getPendingRelationships } from '#/queries/relationships';
+import { getCurrentUser } from '#/queries/users';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { Users2 } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
+import { FriendStatus } from '#/types/users';
+
+export const Route = createFileRoute('/app/friends')({
+  component: RouteComponent,
+})
+
+function RouteComponent() {
+
+  const [outgoingUser, setOutgoingUser] = useState<string>("");
+  const [friendsState, setFriendsState] = useState<"ALL" | "FRIENDS">("ALL");
+
+  const queryClient = useQueryClient();
+
+  const { data: currentUser } = useQuery({
+    queryKey: ["users"],
+    queryFn: getCurrentUser
+  });
+
+  const { data: pendingPelationships, isLoading: isPendingRelationshipsLoading } = useQuery({
+    queryKey: ["relationships", "pending"],
+    queryFn: getPendingRelationships,
+  });
+
+  const { data: friendRelationships, isLoading: isFriendRelationshipsLoading } = useQuery({
+    queryKey: ["relationships", "friends"],
+    queryFn: getFriendRelationships
+  });
+
+  const { mutate: createRelationshipMutation } = useMutation({
+    mutationKey: ["relationships", "create"],
+    mutationFn: createRelationship
+  });
+
+  const { mutate: acceptFriendRelationshipMutation } = useMutation({
+    mutationKey: ["relationships", "accept"],
+    mutationFn: acceptFriendRelationship
+  });
+
+  function relationshipHandler(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    queryClient.invalidateQueries({ queryKey: ["relationships"] });
+    createRelationshipMutation(outgoingUser);
+  }
+
+  function friendRelationshipHandler(username: string) {
+    acceptFriendRelationshipMutation(username);
+  }
+
+  return <div>
+    <div className="flex flex-row px-3 py-2 gap-x-3">
+      <div className="flex gap-x-2 flex-row rounded-md items-center text-left text-sm leading-tight">
+        <Users2 />
+        <span className="truncate font-semibold">
+          Friends
+        </span>
+      </div>
+      <ButtonGroup>
+        <Button size="xl" onClick={() => setFriendsState("ALL")} variant='ghost'>All</Button>
+        <ButtonGroupSeparator />
+        <Button size="xl" onClick={() => setFriendsState("FRIENDS")} variant='ghost'>Add Friend</Button>
+      </ButtonGroup>
+    </div>
+    <Separator />
+    {friendsState === "FRIENDS" &&
+      <form onSubmit={relationshipHandler}>
+        <ButtonGroup className="px-4 py-3 w-full">
+          <Input className="h-12" onChange={(e) => setOutgoingUser(e.target.value)} placeholder="Enter a username..." />
+          <Button className="cursor-pointer h-12" variant="outline">Send friend request</Button>
+        </ButtonGroup>
+      </form>
+    }
+    {friendsState === "ALL" &&
+      <div>
+        {!isPendingRelationshipsLoading && pendingPelationships?.map((r, i) => {
+          return r.status === FriendStatus.PENDING && <div key={i}>
+            <div>
+              <ButtonGroup className="flex gap-x-2 w-full p-2 items-center hover:bg-sidebar-accent">
+                <Avatar size="lg">
+                  <AvatarImage>{r.outgoingUser.avatar}</AvatarImage>
+                  <AvatarFallback>{r.outgoingUser.username}</AvatarFallback>
+                </Avatar>
+                <div className="grid flex-1 text-left text-sm leading-tight">
+                  <span className="truncate font-medium">{r.outgoingUser.username}</span>
+                </div>
+                <Button variant="ghost" className="cursor-pointer" onClick={() => friendRelationshipHandler(r.outgoingUser.username)}>Accept</Button>
+              </ButtonGroup>
+            </div>
+          </div>
+        })}
+
+        {!isFriendRelationshipsLoading && currentUser && friendRelationships?.map((r, i) => {
+          const otherUser = r.incomingUser.username === currentUser.username ? r.outgoingUser : r.incomingUser;
+          return r.status === FriendStatus.FRIENDS && <div key={i}>
+            <div>
+              <Link to="/app/$id1/$id2" params={{ id1: r.guild.guildId, id2: r.guild.channels[0].channelId }}>
+                <ButtonGroup className="flex gap-x-2 w-full p-2 items-center hover:bg-sidebar-accent">
+                  <Avatar size="lg">
+                    <AvatarImage>
+                      {otherUser.avatar}
+                    </AvatarImage>
+                    <AvatarFallback>
+                      {otherUser.username}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="grid flex-1 text-left text-sm leading-tight">
+                    <span className="truncate font-medium">
+                      {otherUser.username}
+                    </span>
+                  </div>
+                </ButtonGroup>
+              </Link>
+            </div>
+          </div>
+        })}
+      </div>
+    }
+  </div>
+}
