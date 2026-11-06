@@ -6,6 +6,7 @@ import { Separator } from "./separator";
 import { FriendsButton } from "./friends-button";
 import { DmFriends } from "./dm-friends";
 import { GuildType } from "#/types/guild";
+import { useEffect } from "react";
 
 type DmSidebarProps = {
   id1?: string

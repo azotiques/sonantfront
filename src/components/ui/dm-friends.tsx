@@ -20,9 +20,7 @@ export function DmFriends({ isFriendRelationshipsLoading, friendRelationships, c
             <Link to="/app/$id1/$id2" params={{ id1: r.guildId, id2: r.channelId }}>
               <ButtonGroup className="rounded-md flex gap-x-2 w-full p-2 items-center hover:bg-sidebar-accent">
                 <Avatar size="lg">
-                  <AvatarImage>
-                    {otherUser.avatar}
-                  </AvatarImage>
+                  <AvatarImage src={otherUser.avatar} />
                   <AvatarFallback>
                     {otherUser.username}
                   </AvatarFallback>

@@ -4,7 +4,7 @@ import { format, isValid } from 'date-fns';
 import { deleteMessages, getMessages } from '#/queries/messages';
 import { stomp } from '#/stomp-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ResizablePanel, ResizablePanelGroup } from '#/components/ui/resizable';
 import { Ellipsis, Trash } from 'lucide-react';
