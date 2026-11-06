@@ -2,8 +2,8 @@ import { createGuild, getGuilds } from "#/queries/guilds";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarRail } from "./sidebar";
 import { Link, useParams } from "@tanstack/react-router";
-import { Plus } from "lucide-react";
-import { getCurrentUser } from "#/queries/users";
+import { Plus, Settings } from "lucide-react";
+import { editUser, getCurrentUser } from "#/queries/users";
 import { useState, type FormEvent } from "react";
 import { ResizablePanelGroup } from "./resizable";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./dialog";
@@ -29,6 +29,7 @@ export function AppSidebar() {
   });
 
   const [createGuildName, setCreateGuildName] = useState("");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
 
   const { data: currentUser, isLoading: isCurrentUserLoading } = useQuery({
     queryKey: ["users"],
@@ -46,9 +47,23 @@ export function AppSidebar() {
     }
   });
 
+  const { mutate: editUserMutation } = useMutation({
+    mutationKey: ["users"],
+    mutationFn: (file: File) => editUser({ avatar: file }),
+    onSuccess: (updatedUser) => {
+      queryClient.setQueryData(["users"], updatedUser);
+    }
+  });
+
   function createGuildButtonHandler(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     createGuildMutation();
+  }
+
+  function editUserHandler(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!avatarFile) return;
+    editUserMutation(avatarFile);
   }
 
   return (
@@ -122,8 +137,27 @@ export function AppSidebar() {
                 <AvatarImage src={currentUser?.avatar} />
                 <AvatarFallback>{currentUser?.username}</AvatarFallback>
               </Avatar>
-              <div className="grid flex-1 text-left text-sm leading-tight">
+              <div className="flex flex-row justify-between flex-1 items-center text-left text-sm leading-tight">
                 <span className="truncate font-medium">{currentUser?.username}</span>
+                <Dialog>
+                  <DialogTrigger render={<Button className="cursor-pointer" variant="outline" />}>
+                    <Settings />
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle className="text-xl">User settings</DialogTitle>
+                      <form className="flex flex-col gap-y-2" onSubmit={editUserHandler}>
+                        <span className="font-semibold">Set avatar</span>
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => setAvatarFile(e.target.files?.[0] ?? null)}
+                        />
+                        <Button variant="outline" className="cursor-pointer" type="submit">Save</Button>
+                      </form>
+                    </DialogHeader>
+                  </DialogContent>
+                </Dialog>
               </div>
             </ButtonGroup>
           </div>

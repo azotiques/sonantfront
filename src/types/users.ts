@@ -6,8 +6,13 @@ export enum FriendStatus {
   BLOCKED = 'BLOCKED'
 }
 
+export type EditUserRequest = {
+  avatar: File
+}
+
 export type User = {
   id: number,
+  accountSetup: boolean,
   username: string,
   avatar: string,
   createdAt: string

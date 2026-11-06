@@ -4,12 +4,13 @@ import { ButtonGroup, ButtonGroupSeparator } from '#/components/ui/button-group'
 import { Input } from '#/components/ui/input';
 import { Separator } from '#/components/ui/separator';
 import { acceptFriendRelationship, createRelationship, getFriendRelationships, getPendingRelationships } from '#/queries/relationships';
-import { getCurrentUser } from '#/queries/users';
+import { editUser, getCurrentUser } from '#/queries/users';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { Users2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { FriendStatus } from '#/types/users';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '#/components/ui/dialog';
 
 export const Route = createFileRoute('/app/friends')({
   component: RouteComponent,
@@ -19,12 +20,22 @@ function RouteComponent() {
 
   const [outgoingUser, setOutgoingUser] = useState<string>("");
   const [friendsState, setFriendsState] = useState<"ALL" | "FRIENDS">("ALL");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
 
   const queryClient = useQueryClient();
 
-  const { data: currentUser } = useQuery({
+
+  const { data: currentUser, isLoading: isCurrentUserLoading } = useQuery({
     queryKey: ["users"],
     queryFn: getCurrentUser
+  });
+
+  const { mutate: editUserMutation } = useMutation({
+    mutationKey: ["users"],
+    mutationFn: (file: File) => editUser({ avatar: file }),
+    onSuccess: (updatedUser) => {
+      queryClient.setQueryData(["users"], updatedUser);
+    }
   });
 
   const { data: pendingPelationships, isLoading: isPendingRelationshipsLoading } = useQuery({
@@ -39,7 +50,10 @@ function RouteComponent() {
 
   const { mutate: createRelationshipMutation } = useMutation({
     mutationKey: ["relationships", "create"],
-    mutationFn: createRelationship
+    mutationFn: createRelationship,
+    onSuccess: () => {
+      setOutgoingUser("");
+    }
   });
 
   const { mutate: acceptFriendRelationshipMutation } = useMutation({
@@ -55,6 +69,13 @@ function RouteComponent() {
 
   function friendRelationshipHandler(username: string) {
     acceptFriendRelationshipMutation(username);
+  }
+
+  function editUserHandler(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!avatarFile) return;
+    editUserMutation(avatarFile);
+    queryClient.invalidateQueries({ queryKey: ["users"] });
   }
 
   return <div>
@@ -75,8 +96,8 @@ function RouteComponent() {
     {friendsState === "FRIENDS" &&
       <form onSubmit={relationshipHandler}>
         <ButtonGroup className="px-4 py-3 w-full">
-          <Input className="h-12" onChange={(e) => setOutgoingUser(e.target.value)} placeholder="Enter a username..." />
-          <Button className="cursor-pointer h-12" variant="outline">Send friend request</Button>
+          <Input className="h-12" value={outgoingUser} onChange={(e) => setOutgoingUser(e.target.value)} placeholder="Enter a username..." />
+          <Button type="submit" className="cursor-pointer h-12" variant="outline">Send friend request</Button>
         </ButtonGroup>
       </form>
     }
@@ -98,6 +119,24 @@ function RouteComponent() {
             </div>
           </div>
         })}
+        {!isCurrentUserLoading && (<div>
+          <Dialog open={!currentUser?.accountSetup}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="text-xl">Set up your account</DialogTitle>
+                <form className="flex flex-col gap-y-2" onSubmit={editUserHandler}>
+                  <span className="text-sm">Set your profile picture</span>
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setAvatarFile(e.target.files?.[0] ?? null)}
+                  />
+                  <Button variant="outline" className="cursor-pointer" type="submit">Save</Button>
+                </form>
+              </DialogHeader>
+            </DialogContent>
+          </Dialog>
+        </div>)}
 
         {!isFriendRelationshipsLoading && currentUser && friendRelationships?.map((r, i) => {
           const otherUser = r.incomingUser.username === currentUser.username ? r.outgoingUser : r.incomingUser;
