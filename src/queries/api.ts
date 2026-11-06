@@ -1,6 +1,6 @@
 import { keycloak } from "#/keycloak";
 
-const API_URL = `https://${import.meta.env.VITE_API_LINK}/api/v1`;
+const API_URL = `${import.meta.env.VITE_API_LINK}/api/v1`;
 
 export class ApiError extends Error {
   status: number;
@@ -24,14 +24,16 @@ export async function api<T>(path: string, { method = 'GET', body }: ApiInit = {
     Authorization: `Bearer ${keycloak.token}`
   };
 
-  if (body !== undefined) {
+  const isFormData = body instanceof FormData;
+
+  if (body !== undefined && !isFormData) {
     headers['Content-Type'] = 'application/json';
   }
 
   const res = await fetch(`${API_URL}${path}`, {
     method,
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body)
+    body: body === undefined ? undefined : isFormData ? body : JSON.stringify(body)
   });
 
   if (!res.ok) {
