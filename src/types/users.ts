@@ -22,7 +22,8 @@ export type Relationship = {
   status: FriendStatus,
   incomingUser: User,
   outgoingUser: User,
-  guild: Guild
+  guildId: string,
+  channelId: string
 }
 
 export type RelationshipCreated = {
