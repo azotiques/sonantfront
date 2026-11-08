@@ -152,10 +152,10 @@ function RouteComponent() {
     });
 
     return () => subscription.unsubscribe();
-  }, [connected, id1, id2, currentUser?.id, setTyping]);
+  }, [connected, isSuccess, id1, id2, currentUser?.id, setTyping]);
 
   useEffect(() => {
-    if (!connected || !stomp.connected || !id1 || !id2) return;
+    if (!connected || !isSuccess || !stomp.connected || !id1 || !id2) return;
 
     const subscription = stomp.subscribe(`/topic/chat.guild.${id1}.${id2}`, (frame) => {
       const incoming: Message = JSON.parse(frame.body);
@@ -164,7 +164,7 @@ function RouteComponent() {
     });
 
     return () => subscription.unsubscribe();
-  }, [connected, id1, id2, queryClient]);
+  }, [connected, isSuccess, id1, id2, queryClient, clearTyping]);
 
   return <div className="h-full">
     <div className="grid h-full grid-rows-[1fr_auto] overflow-hidden">
