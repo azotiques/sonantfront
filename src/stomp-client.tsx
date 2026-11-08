@@ -1,5 +1,7 @@
 import { Client } from "@stomp/stompjs";
+import { createContext, useContext } from "react";
 import { keycloak } from "./keycloak";
+import { create } from "zustand";
 
 export const stomp = new Client({
   brokerURL: `${import.meta.env.VITE_WS_LINK}/ws`,
@@ -12,8 +14,24 @@ export const stomp = new Client({
     };
   },
   onConnect: () => {
-    console.log("connected");
+    useStompStore.getState().setConnected(true);
+  },
+  onDisconnect: () => {
+    useStompStore.getState().setConnected(false);
+  },
+  onWebSocketClose: () => {
+    useStompStore.getState().setConnected(false);
   },
   onStompError: frame => console.error('broker error', frame.headers['message']),
   onWebSocketError: event => console.error('ws error', event)
 });
+
+type StompStore = {
+  connected: boolean,
+  setConnected: (connected: boolean) => void;
+}
+
+export const useStompStore = create<StompStore>((set) => ({
+  connected: false,
+  setConnected: (connected) => set({ connected })
+}));

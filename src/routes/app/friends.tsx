@@ -1,16 +1,18 @@
-import { Avatar, AvatarFallback, AvatarImage } from '#/components/ui/avatar';
+import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from '#/components/ui/avatar';
 import { Button } from '#/components/ui/button';
 import { ButtonGroup, ButtonGroupSeparator } from '#/components/ui/button-group';
 import { Input } from '#/components/ui/input';
 import { Separator } from '#/components/ui/separator';
-import { acceptFriendRelationship, createRelationship, getFriendRelationships, getPendingRelationships } from '#/queries/relationships';
+import { getFriendRelationships, getPendingRelationships } from '#/queries/relationships';
 import { editUser, getCurrentUser } from '#/queries/users';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { Users2 } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
-import { FriendStatus } from '#/types/users';
+import { useEffect, useState, type FormEvent } from 'react';
+import { FriendStatus, type Relationship, type RelationshipRequest, type User } from '#/types/users';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '#/components/ui/dialog';
+import { stomp, useStompStore } from '#/stomp-client';
+import { usePresenceStore } from '#/stores/presence-store';
 
 export const Route = createFileRoute('/app/friends')({
   component: RouteComponent,
@@ -21,9 +23,9 @@ function RouteComponent() {
   const [outgoingUser, setOutgoingUser] = useState<string>("");
   const [friendsState, setFriendsState] = useState<"ALL" | "FRIENDS">("ALL");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const connected = useStompStore((state) => state.connected);
 
   const queryClient = useQueryClient();
-
 
   const { data: currentUser, isLoading: isCurrentUserLoading } = useQuery({
     queryKey: ["users"],
@@ -45,30 +47,17 @@ function RouteComponent() {
 
   const { data: friendRelationships, isLoading: isFriendRelationshipsLoading } = useQuery({
     queryKey: ["relationships", "friends"],
-    queryFn: getFriendRelationships
+    queryFn: getFriendRelationships,
+    staleTime: Infinity,
   });
-
-  const { mutate: createRelationshipMutation } = useMutation({
-    mutationKey: ["relationships", "create"],
-    mutationFn: createRelationship,
-    onSuccess: () => {
-      setOutgoingUser("");
-    }
-  });
-
-  const { mutate: acceptFriendRelationshipMutation } = useMutation({
-    mutationKey: ["relationships", "accept"],
-    mutationFn: acceptFriendRelationship
-  });
-
-  function relationshipHandler(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    queryClient.invalidateQueries({ queryKey: ["relationships"] });
-    createRelationshipMutation(outgoingUser);
-  }
 
   function friendRelationshipHandler(username: string) {
-    acceptFriendRelationshipMutation(username);
+    const body: RelationshipRequest = { outgoingUser: username };
+
+    stomp.publish({
+      destination: `/app/relationships/accept`,
+      body: JSON.stringify(body)
+    });
   }
 
   function editUserHandler(e: FormEvent<HTMLFormElement>) {
@@ -77,6 +66,45 @@ function RouteComponent() {
     editUserMutation(avatarFile);
     queryClient.invalidateQueries({ queryKey: ["users"] });
   }
+
+  function relationshipHandler(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+
+    const body: RelationshipRequest = { outgoingUser };
+
+    stomp.publish({
+      destination: `/app/relationships`,
+      body: JSON.stringify(body)
+    });
+
+    setOutgoingUser("");
+  }
+
+  const statuses = usePresenceStore((state) => state.statuses);
+
+  useEffect(() => {
+    if (!connected || !stomp.connected || !currentUser?.id)
+      return;
+
+    const pendingSubscription = stomp.subscribe(`/topic/relationships.${currentUser.id}`, (frame) => {
+      const incoming: Relationship = JSON.parse(frame.body);
+      queryClient.setQueryData<Relationship[]>(["relationships", "pending"], (old = []) => [...old, incoming]);
+    });
+
+    const friendsSubscription = stomp.subscribe(`/topic/relationships.friends.${currentUser.id}`, (frame) => {
+      const incoming: Relationship[] = JSON.parse(frame.body);
+
+      queryClient.setQueryData<Relationship[]>(["relationships", "friends"], incoming);
+    });
+
+    stomp.publish({ destination: `/app/relationships/friends` });
+
+    return () => {
+      pendingSubscription.unsubscribe();
+      friendsSubscription.unsubscribe();
+    };
+
+  }, [connected, currentUser?.id, queryClient]);
 
   return <div>
     <div className="flex flex-row px-3 py-2 gap-x-3">
@@ -101,6 +129,7 @@ function RouteComponent() {
         </ButtonGroup>
       </form>
     }
+
     {friendsState === "ALL" &&
       <div>
         {!isPendingRelationshipsLoading && pendingPelationships?.map((r, i) => {
@@ -119,6 +148,7 @@ function RouteComponent() {
             </div>
           </div>
         })}
+
         {!isCurrentUserLoading && (<div>
           <Dialog open={!currentUser?.accountSetup}>
             <DialogContent>
@@ -149,6 +179,7 @@ function RouteComponent() {
                     <AvatarFallback>
                       {otherUser.username}
                     </AvatarFallback>
+                    {statuses[otherUser.id] === "ONLINE" && <AvatarBadge className="bg-green-600" />}
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-medium">

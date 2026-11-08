@@ -1,7 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import { ButtonGroup } from "./button-group";
-import { Avatar, AvatarFallback, AvatarImage } from "./avatar";
+import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from "./avatar";
 import { FriendStatus, type Relationship, type User } from "#/types/users";
+import { usePresenceStore } from "#/stores/presence-store";
+import { cn } from "cn";
 
 type DmFriendsProps = {
   isFriendRelationshipsLoading: boolean,
@@ -10,7 +12,9 @@ type DmFriendsProps = {
 }
 
 export function DmFriends({ isFriendRelationshipsLoading, friendRelationships, currentUser }: DmFriendsProps) {
-  console.log(friendRelationships);
+
+  const statuses = usePresenceStore((state) => state.statuses);
+
   return (
     <div>
       {!isFriendRelationshipsLoading && currentUser && friendRelationships?.map((r, i) => {
@@ -24,6 +28,7 @@ export function DmFriends({ isFriendRelationshipsLoading, friendRelationships, c
                   <AvatarFallback>
                     {otherUser.username}
                   </AvatarFallback>
+                  <AvatarBadge className={cn(statuses[otherUser.id] === "ONLINE" ? "bg-green-600" : "border-2 border-neutral-600 ring-2 bg-neutral-950 ring-neutral-950")} />
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">

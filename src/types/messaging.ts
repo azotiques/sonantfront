@@ -6,7 +6,8 @@ export type Message = {
   user: User,
   channelId: number,
   guildId: number,
-  createdAt: string
+  createdAt: string,
+  attachments?: string[]
 }
 
 export type MessageRequest = {
@@ -17,7 +18,8 @@ export type SendMessageRequest = {
   message: string,
   user: User,
   guildId: number,
-  channelId: number
+  channelId: number,
+  attachments?: string[]
 }
 
 export type SendMessageResponse = {
@@ -26,5 +28,6 @@ export type SendMessageResponse = {
   user: User,
   guildId: string,
   channelId: string,
-  createdAt: string
+  createdAt: string,
+  attachments?: string[]
 }

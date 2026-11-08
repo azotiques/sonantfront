@@ -7,16 +7,13 @@ import { FriendsButton } from "./friends-button";
 import { DmFriends } from "./dm-friends";
 import { GuildType } from "#/types/guild";
 import { useEffect } from "react";
+import type { Relationship } from "#/types/users";
 
 type DmSidebarProps = {
   id1?: string
 }
 
 export function DmSidebar({ id1 }: DmSidebarProps) {
-  const { data: friendRelationships, isLoading: isFriendRelationshipsLoading } = useQuery({
-    queryKey: ["relationships", "friends"],
-    queryFn: getFriendRelationships
-  });
 
   const { data: currentGuild } = useQuery({
     queryKey: ["guilds", id1],
@@ -26,6 +23,12 @@ export function DmSidebar({ id1 }: DmSidebarProps) {
   const { data: currentUser } = useQuery({
     queryKey: ["users"],
     queryFn: getCurrentUser
+  });
+
+  const { data: friendRelationships, isLoading: isFriendRelationshipsLoading } = useQuery({
+    queryKey: ["relationships", "friends"],
+    queryFn: getFriendRelationships,
+    staleTime: Infinity,
   });
 
   return (

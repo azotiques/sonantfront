@@ -157,7 +157,7 @@ export function ChannelSidebar({ id1, id2 }: ChannelSidebarProps) {
                     to="/app/$id1/$id2"
                     params={{ id1: currentGuild.guildId, id2: c.channelId }}
                   >
-                    <Button variant="ghost" className={cn("justify-between items-center cursor-pointer h-10 w-full text-neutral-500", c.channelId === id2 && "text-neutral-100 bg-sidebar-accent")}>
+                    <div className={cn("justify-between rounded-md flex flex-row px-2 py-1 items-center cursor-pointer h-10 w-full text-neutral-500", c.channelId === id2 && "text-neutral-100 bg-sidebar-accent")}>
                       <div className="flex gap-x-1 flex-row items-center">
                         <Hash className="size-6" />
                         <span className="text-base lowercase">{c.name}</span>
@@ -173,7 +173,7 @@ export function ChannelSidebar({ id1, id2 }: ChannelSidebarProps) {
                           </DialogContent>
                         </Dialog>
                       </div>
-                    </Button>
+                    </div>
                   </Link>
                 )
               })}

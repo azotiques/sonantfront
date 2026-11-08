@@ -6,12 +6,17 @@ export enum FriendStatus {
   BLOCKED = 'BLOCKED'
 }
 
+export type RelationshipRequest = {
+  outgoingUser: string
+}
+
 export type EditUserRequest = {
   avatar: File
 }
 
 export type User = {
-  id: number,
+  id: string,
+  status?: "ONLINE" | "OFFLINE" | null,
   accountSetup: boolean,
   username: string,
   avatar: string,

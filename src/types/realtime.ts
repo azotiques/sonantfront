@@ -1,3 +1,4 @@
 export type ChatMessage = {
-  message: string
+  message: string,
+  attachments?: string[]
 }

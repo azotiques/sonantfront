@@ -9,11 +9,12 @@ import { ResizablePanelGroup } from "./resizable";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./dialog";
 import { Button } from "./button";
 import { Input } from "./input";
-import { Avatar, AvatarFallback, AvatarImage } from "./avatar";
+import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from "./avatar";
 import { ButtonGroup } from "./button-group";
 import { DmSidebar } from "./dm-sidebar";
 import { ChannelSidebar } from "./channel-sidebar";
 import { GuildType, type Guild } from "#/types/guild";
+import { usePresenceStore } from "#/stores/presence-store";
 
 export function AppSidebar() {
 
@@ -27,6 +28,8 @@ export function AppSidebar() {
     queryKey: ["guilds"],
     queryFn: getGuilds
   });
+
+  const statuses = usePresenceStore((state) => state.statuses);
 
   const [createGuildName, setCreateGuildName] = useState("");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -136,6 +139,7 @@ export function AppSidebar() {
               <Avatar size="lg">
                 <AvatarImage src={currentUser?.avatar} />
                 <AvatarFallback>{currentUser?.username}</AvatarFallback>
+                <AvatarBadge className="bg-green-600" />
               </Avatar>
               <div className="flex flex-row justify-between flex-1 items-center text-left text-sm leading-tight">
                 <span className="truncate font-medium">{currentUser?.username}</span>

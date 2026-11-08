@@ -6,3 +6,13 @@ export const getMessages = (guildId: string, channelId: string) =>
 
 export const deleteMessages = (guildId: string, channelId: string, messageRequest: MessageRequest) =>
   api<void>(`/messages/${guildId}/${channelId}`, { method: 'DELETE', body: messageRequest });
+
+export const uploadAttachments = (guildId: string, channelId: string, files: File[]) => {
+  const formData = new FormData();
+  files.forEach((file) => formData.append("attachments", file));
+
+  return api<string[]>(`/messages/${guildId}/${channelId}/attachments`, {
+    method: 'POST',
+    body: formData,
+  });
+};

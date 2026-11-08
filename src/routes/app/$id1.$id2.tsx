@@ -1,19 +1,20 @@
 import { Button } from '#/components/ui/button';
 import { Input } from '#/components/ui/input';
 import { format, isValid } from 'date-fns';
-import { deleteMessages, getMessages } from '#/queries/messages';
-import { stomp } from '#/stomp-client';
+import { deleteMessages, getMessages, uploadAttachments } from '#/queries/messages';
+import { stomp, useStompStore } from '#/stomp-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createFileRoute, redirect } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { ResizablePanel, ResizablePanelGroup } from '#/components/ui/resizable';
-import { Ellipsis, Trash } from 'lucide-react';
+import { Ellipsis, Paperclip, Trash, X } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '#/components/ui/dropdown-menu';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '#/components/ui/hover-card';
 import { Avatar, AvatarFallback, AvatarImage } from '#/components/ui/avatar';
 import type { Message } from '#/types/messaging';
 import type { ChatMessage } from '#/types/realtime';
 import { ButtonGroup } from '#/components/ui/button-group';
+import { useTypingStore } from '#/stores/typing-store';
+import { getCurrentUser } from '#/queries/users';
 
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
 
@@ -26,13 +27,29 @@ function RouteComponent() {
 
   const queryClient = useQueryClient();
 
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const navigate = Route.useNavigate();
 
-  const { data: messageQuery } = useQuery({
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const { data: currentUser } = useQuery({
+    queryKey: ["users"],
+    queryFn: getCurrentUser
+  });
+
+  const { data: messageQuery, isError, isSuccess } = useQuery({
     queryKey: ["messages", id1, id2],
     queryFn: () => getMessages(id1, id2),
-    enabled: !!id1 && !!id2
+    enabled: !!id1 && !!id2,
+    retry: false
   });
+
+
+  useEffect(() => {
+    if (isError) {
+      navigate({ to: "/app/friends" });
+    }
+  }, [isError, navigate]);
 
   const messages = messageQuery ?? [];
 
@@ -44,17 +61,60 @@ function RouteComponent() {
     }
   });
 
+  const { mutateAsync: uploadAttachmentsMutation, isPending: isUploading } = useMutation({
+    mutationKey: ["attachments", id1, id2],
+    mutationFn: (selectedFiles: File[]) => uploadAttachments(id1, id2, selectedFiles),
+  });
+
   const [message, setMessage] = useState<string>("");
-  const [connected, setConnected] = useState(false);
+  const [files, setFiles] = useState<File[]>([]);
+  const connected = useStompStore((state) => state.connected);
+  const lastTypedRef = useRef<number>(0);
 
   function deleteMessageHandler(messageId: string) {
     deleteMessageMutation(messageId);
   }
 
-  function messageHandler(e: FormEvent<HTMLFormElement>) {
+  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setMessage(e.target.value);
+
+    const now = Date.now();
+
+    if (e.target.value.trim() && now - lastTypedRef.current > 3000) {
+      lastTypedRef.current = now;
+
+      stomp.publish({
+        destination: `/app/chat/${id1}/${id2}/typing`,
+      });
+    }
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const selected = e.target.files;
+    if (!selected || selected.length === 0) return;
+    setFiles((prev) => [...prev, ...Array.from(selected)]);
+    e.target.value = "";
+  }
+
+  function removeFile(index: number) {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function messageHandler(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
-    const body: ChatMessage = { message };
+    if (!message.trim() && files.length === 0) return;
+
+    let attachmentKeys: string[] = [];
+
+    if (files.length > 0) {
+      attachmentKeys = await uploadAttachmentsMutation(files);
+    }
+
+    const body: ChatMessage = {
+      message,
+      attachments: attachmentKeys,
+    };
 
     stomp.publish({
       destination: `/app/chat/${id1}/${id2}`,
@@ -62,22 +122,9 @@ function RouteComponent() {
     });
 
     setMessage("");
+    setFiles([]);
+    lastTypedRef.current = 0;
   }
-
-  useEffect(() => {
-    stomp.onConnect = () => {
-      setConnected(true);
-    }
-    stomp.onDisconnect = () => {
-      setConnected(false);
-    }
-
-    stomp.activate();
-
-    return () => {
-      stomp.deactivate();
-    }
-  }, [])
 
   useEffect(() => {
     const container = scrollRef.current;
@@ -88,11 +135,31 @@ function RouteComponent() {
     });
   }, [messages]);
 
+  const setTyping = useTypingStore((state) => state.setTyping);
+  const clearTyping = useTypingStore((state) => state.clearTyping);
+  const typingUsers = useTypingStore((state) => state.typingByChannel[id2]);
+  const typingUsernames = typingUsers ? Object.values(typingUsers) : [];
+
   useEffect(() => {
-    if (!connected || !id1 || !id2) return;
+    if (!connected || !isSuccess || !stomp.connected || !id1 || !id2) return;
+
+    const subscription = stomp.subscribe(`/topic/chat.guild.${id1}.${id2}.typing`, (frame) => {
+      const incoming = JSON.parse(frame.body);
+
+      if (incoming.userId === currentUser?.id) return;
+
+      setTyping(id2, incoming.userId, incoming.userDto);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [connected, id1, id2, currentUser?.id, setTyping]);
+
+  useEffect(() => {
+    if (!connected || !stomp.connected || !id1 || !id2) return;
 
     const subscription = stomp.subscribe(`/topic/chat.guild.${id1}.${id2}`, (frame) => {
       const incoming: Message = JSON.parse(frame.body);
+      clearTyping(id2, incoming.user.id);
       queryClient.setQueryData<Message[]>(["messages", id1, id2], (old = []) => [...old, incoming]);
     });
 
@@ -140,7 +207,28 @@ function RouteComponent() {
                         </span>
                       </div>
                     )}
-                    <span className="whitespace-pre-wrap wrap-break-word">{m.message}</span>
+                    {m.message && (
+                      <span className="whitespace-pre-wrap wrap-break-word">{m.message}</span>
+                    )}
+                    {m.attachments && m.attachments.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {m.attachments.map((url, idx) => (
+                          <a
+                            key={idx}
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block overflow-hidden rounded-md border border-border"
+                          >
+                            <img
+                              src={url}
+                              alt={`Attachment ${idx + 1}`}
+                              className="max-h-64 max-w-xs rounded-md object-contain"
+                            />
+                          </a>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </HoverCardTrigger>
@@ -161,10 +249,50 @@ function RouteComponent() {
         )}
       </div>
       <div className="p-4">
+        {typingUsernames.length > 0 && (
+          <div className="mb-2 px-2 py-1 bg-neutral-800 rounded-md text-xs text-neutral-400">{typingUsernames.join(", ")} {typingUsernames.length === 1 ? "is" : "are"} typing<span className="animate-pulse">...</span></div>
+        )}
+        {files.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-2">
+            {files.map((file, idx) => (
+              <div
+                key={`${file.name}-${idx}`}
+                className="flex items-center gap-1.5 rounded-md bg-neutral-800 px-2.5 py-1 text-xs text-neutral-200"
+              >
+                <span className="max-w-40 truncate">{file.name}</span>
+                <button
+                  type="button"
+                  onClick={() => removeFile(idx)}
+                  className="cursor-pointer text-neutral-400 hover:text-neutral-100"
+                >
+                  <X className="size-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         <form className="flex items-center gap-2" onSubmit={messageHandler}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={handleFileChange}
+          />
           <ButtonGroup className="flex-1 border-neutral-100">
-            <Input className="h-14" value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Message..." />
-            <Button type="submit" variant="outline" className="h-14">Send</Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-14 cursor-pointer"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+            >
+              <Paperclip className="size-4" />
+            </Button>
+            <Input className="h-14" value={message} onChange={handleInputChange} placeholder="Message..." />
+            <Button type="submit" variant="outline" className="h-14 cursor-pointer" disabled={isUploading}>
+              {isUploading ? "Uploading..." : "Send"}
+            </Button>
           </ButtonGroup>
         </form>
       </div>
